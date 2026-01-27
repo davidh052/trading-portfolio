@@ -44,7 +44,7 @@ A full-stack real-time stock portfolio tracking application with analytics. Buil
 ## Project Structure
 
 ```
-trading-portfolio-tracker/
+.
 ├── backend/
 │   ├── app/
 │   │   ├── api/              # API route handlers
@@ -78,6 +78,34 @@ trading-portfolio-tracker/
 - Node.js 18+
 - Docker (for PostgreSQL)
 - Stock API key (Alpha Vantage, YFinn)
+
+### Quick Start
+
+1. **Start the database**
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Start the backend**
+   ```bash
+   cd backend
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   uvicorn main:app --reload
+   ```
+
+3. **Start the frontend** (in a new terminal)
+   ```bash
+   cd frontend
+   npm install
+   npm start
+   ```
+
+4. **Access the application**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8000
+   - API Docs: http://localhost:8000/docs
 
 ## API Documentation
 
