@@ -1,0 +1,68 @@
+# Ruff configuration for Trading Portfolio Backend
+# https://docs.astral.sh/ruff/
+
+# Target Python version
+target-version = "py310"
+
+# Line length
+line-length = 100
+
+# Exclude directories
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".pytest_cache",
+    "alembic/versions",
+]
+
+[lint]
+# Enable rules
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "PTH",    # flake8-use-pathlib
+    "ERA",    # eradicate (commented-out code)
+    "RUF",    # Ruff-specific rules
+]
+
+# Ignore specific rules
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # function call in default argument (needed for FastAPI Depends)
+    "ARG001", # unused function argument (common in FastAPI routes)
+]
+
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+unfixable = []
+
+[lint.per-file-ignores]
+# Tests can use assert and have unused imports
+"tests/**/*.py" = ["S101", "ARG", "F401"]
+# __init__ files can have unused imports
+"__init__.py" = ["F401"]
+
+[lint.isort]
+known-first-party = ["app"]
+force-single-line = false
+combine-as-imports = true
+
+[format]
+# Use double quotes for strings
+quote-style = "double"
+# Indent with spaces
+indent-style = "space"
+# Respect magic trailing commas
+skip-magic-trailing-comma = false
+# Unix-style line endings
+line-ending = "auto"
