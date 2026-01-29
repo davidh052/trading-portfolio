@@ -131,9 +131,9 @@ Key tables:
 - [X] Basic portfolio analytics
 
 ### Phase 2: Real-time Features
-- [ ] Stock search integration with external API
-- [ ] WebSocket implementation for live prices
-- [ ] Real-time portfolio value updates
+- [X] Stock search integration with external API
+- [X] WebSocket implementation for live prices
+- [X] Real-time portfolio value updates
 - [ ] Watchlist with price tracking
 
 ### Phase 3: Analytics & Visualization
