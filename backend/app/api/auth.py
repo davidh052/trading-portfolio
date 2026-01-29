@@ -1,17 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from pydantic import BaseModel, EmailStr
-from passlib.context import CryptContext
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
-from typing import Optional, List
-from decimal import Decimal
 import os
+from datetime import datetime, timedelta
+from decimal import Decimal
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from pydantic import BaseModel, EmailStr
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.user import User
 from app.models.stock_holding import StockHolding
+from app.models.user import User
 from app.services.stock_service import stock_service
 
 router = APIRouter()
@@ -60,17 +59,17 @@ class StockHoldingResponse(BaseModel):
     symbol: str
     quantity: Decimal
     average_cost: Decimal
-    current_price: Optional[Decimal] = None
-    market_value: Optional[Decimal] = None
-    gain_loss: Optional[Decimal] = None
-    gain_loss_percentage: Optional[Decimal] = None
+    current_price: Decimal | None = None
+    market_value: Decimal | None = None
+    gain_loss: Decimal | None = None
+    gain_loss_percentage: Decimal | None = None
 
     class Config:
         from_attributes = True
 
 class PortfolioResponse(BaseModel):
     cash_balance: Decimal
-    holdings: List[StockHoldingResponse]
+    holdings: list[StockHoldingResponse]
     total_market_value: Decimal
     total_gain_loss: Decimal
     total_gain_loss_percentage: Decimal
@@ -90,7 +89,7 @@ def get_password_hash(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta

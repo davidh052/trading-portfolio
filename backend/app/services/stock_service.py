@@ -1,8 +1,8 @@
 import os
-import yfinance as yf
+from datetime import datetime
+
 import requests
-from typing import Dict, List, Optional
-from datetime import datetime, timedelta
+import yfinance as yf
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,7 +15,7 @@ class StockService:
     """Service for fetching stock data from Alpha Vantage and yfinance"""
 
     @staticmethod
-    def search_stocks(query: str) -> List[Dict]:
+    def search_stocks(query: str) -> list[dict]:
         """Search for stocks by symbol or company name using Alpha Vantage"""
         try:
             params = {
@@ -58,7 +58,7 @@ class StockService:
             return []
 
     @staticmethod
-    def get_stock_quote(symbol: str) -> Optional[Dict]:
+    def get_stock_quote(symbol: str) -> dict | None:
         """Get real-time quote for a stock using yfinance (primary) and Alpha Vantage (backup)"""
         try:
             # Primary: yfinance (faster and no rate limits)
@@ -106,7 +106,7 @@ class StockService:
                 response.raise_for_status()
                 data = response.json()
 
-                if "Global Quote" in data and data["Global Quote"]:
+                if data.get("Global Quote"):
                     quote = data["Global Quote"]
                     return {
                         "symbol": quote.get("01. symbol"),
@@ -129,7 +129,7 @@ class StockService:
             return None
 
     @staticmethod
-    def get_stock_history(symbol: str, period: str = "1M") -> Optional[Dict]:
+    def get_stock_history(symbol: str, period: str = "1M") -> dict | None:
         """Get historical price data using yfinance"""
         try:
             # Map period to yfinance period format
@@ -181,7 +181,7 @@ class StockService:
             return None
 
     @staticmethod
-    def get_company_info(symbol: str) -> Optional[Dict]:
+    def get_company_info(symbol: str) -> dict | None:
         """Get company information and fundamentals using yfinance"""
         try:
             print(f"Fetching company info for {symbol}")

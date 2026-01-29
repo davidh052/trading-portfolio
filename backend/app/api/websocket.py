@@ -1,6 +1,6 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from typing import List
 import json
+
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 router = APIRouter()
 
@@ -8,7 +8,7 @@ class ConnectionManager:
     """Manages WebSocket connections for real-time stock updates"""
 
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: list[WebSocket] = []
         self.subscriptions: dict = {}  # {websocket: [symbols]}
 
     async def connect(self, websocket: WebSocket):
@@ -21,7 +21,7 @@ class ConnectionManager:
         if websocket in self.subscriptions:
             del self.subscriptions[websocket]
 
-    async def subscribe(self, websocket: WebSocket, symbols: List[str]):
+    async def subscribe(self, websocket: WebSocket, symbols: list[str]):
         """Subscribe to stock price updates"""
         if websocket in self.subscriptions:
             self.subscriptions[websocket] = symbols
