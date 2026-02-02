@@ -16,45 +16,37 @@ class StockService:
 
     @staticmethod
     def search_stocks(query: str) -> list[dict]:
-        """Search for stocks by symbol or company name using Alpha Vantage"""
+        """Search for stocks using Yahoo Finance search API (consistent with yfinance data)"""
         try:
+            # Use Yahoo Finance search API directly for consistency with yfinance
+            url = "https://query1.finance.yahoo.com/v1/finance/search"
             params = {
-                "function": "SYMBOL_SEARCH",
-                "keywords": query,
-                "apikey": ALPHA_VANTAGE_API_KEY
+                "q": query,
+                "quotesCount": 10,
+                "newsCount": 0,
+                "listsCount": 0,
+                "quotesQueryId": "tss_match_phrase_query"
             }
-            response = requests.get(ALPHA_VANTAGE_BASE_URL, params=params, timeout=10)
+            headers = {"User-Agent": "Mozilla/5.0"}
+            response = requests.get(url, params=params, headers=headers, timeout=10)
             response.raise_for_status()
             data = response.json()
 
-            if "bestMatches" in data:
-                results = []
-                for match in data["bestMatches"][:10]:
-                    results.append({
-                        "symbol": match.get("1. symbol"),
-                        "name": match.get("2. name"),
-                        "type": match.get("3. type"),
-                        "region": match.get("4. region"),
-                        "currency": match.get("8. currency")
-                    })
-                return results
-            return []
+            results = []
+            for quote in data.get("quotes", []):
+                # Filter to only equity types (stocks)
+                if quote.get("quoteType") not in ["EQUITY", "ETF"]:
+                    continue
+                results.append({
+                    "symbol": quote.get("symbol"),
+                    "name": quote.get("longname") or quote.get("shortname"),
+                    "type": quote.get("quoteType"),
+                    "region": quote.get("exchange"),
+                    "currency": quote.get("currency", "USD")
+                })
+            return results
         except Exception as e:
-            print(f"Alpha Vantage search error: {e}")
-            # Fallback: try to get basic info from yfinance
-            try:
-                ticker = yf.Ticker(query.upper())
-                info = ticker.info
-                if info and "symbol" in info:
-                    return [{
-                        "symbol": info.get("symbol"),
-                        "name": info.get("longName") or info.get("shortName"),
-                        "type": "Equity",
-                        "region": info.get("country", "US"),
-                        "currency": info.get("currency", "USD")
-                    }]
-            except:
-                pass
+            print(f"Yahoo Finance search error: {e}")
             return []
 
     @staticmethod
