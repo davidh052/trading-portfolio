@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, stocks, transactions, websocket
+from app.api import auth, stocks, transactions, watchlist, websocket
 
 app = FastAPI(
     title="Trading Portfolio Tracker API",
@@ -22,6 +22,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(stocks.router, prefix="/api/stocks", tags=["Stocks"])
 app.include_router(transactions.router, prefix="/api/transactions", tags=["Transactions"])
+app.include_router(watchlist.router, prefix="/api/watchlist", tags=["Watchlist"])
 app.include_router(websocket.router, prefix="/ws", tags=["WebSocket"])
 
 @app.get("/")

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { stocksAPI } from '../services/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 function Stocks() {
+  const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedStock, setSelectedStock] = useState(null);
@@ -13,6 +15,14 @@ function Stocks() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
+
+  // Load stock from URL parameter if provided
+  useEffect(() => {
+    const symbolParam = searchParams.get('symbol');
+    if (symbolParam && !selectedStock) {
+      handleSelectStock(symbolParam);
+    }
+  }, [searchParams]);
 
   // Search stocks as user types
   useEffect(() => {

@@ -47,4 +47,11 @@ export const transactionsAPI = {
   delete: (id) => api.delete(`/api/transactions/${id}`),
 };
 
+// Watchlist API endpoints
+export const watchlistAPI = {
+  getAll: () => api.get('/api/watchlist/'),
+  add: (data) => api.post('/api/watchlist/', data),
+  delete: (id) => api.delete(`/api/watchlist/${id}`),
+};
+
 export default api;

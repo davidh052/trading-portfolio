@@ -23,6 +23,7 @@ function Navbar() {
               <>
                 <Link to="/" className="hover:text-blue-200 transition">Dashboard</Link>
                 <Link to="/stocks" className="hover:text-blue-200 transition">Stocks</Link>
+                <Link to="/watchlist" className="hover:text-blue-200 transition">Watchlist</Link>
                 <Link to="/transactions" className="hover:text-blue-200 transition">Transactions</Link>
                 <span className="text-blue-200">Welcome, {user?.username || user?.email}</span>
                 <button

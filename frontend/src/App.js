@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Stocks from './pages/Stocks';
+import Watchlist from './pages/Watchlist';
 import Transactions from './pages/Transactions';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -24,6 +25,11 @@ function App() {
             <Route path="/stocks" element={
               <ProtectedRoute>
                 <Stocks />
+              </ProtectedRoute>
+            } />
+            <Route path="/watchlist" element={
+              <ProtectedRoute>
+                <Watchlist />
               </ProtectedRoute>
             } />
             <Route path="/transactions" element={
