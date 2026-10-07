@@ -55,3 +55,7 @@ postgres_data/
 #docs
 docs/PROJECT_PLAN.md
 docs/QUICK_START.md
+# Test artifacts
+.coverage
+htmlcov/
+.pytest_cache/

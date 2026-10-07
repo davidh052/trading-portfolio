@@ -10,43 +10,50 @@ from app.database import get_db
 from app.models.stock_holding import StockHolding
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
+from app.services.stock_service import stock_service
 
 router = APIRouter()
+
+STOCK_TRANSACTION_TYPES = [TransactionType.BUY, TransactionType.SELL]
+CASH_TRANSACTION_TYPES = [TransactionType.DEPOSIT, TransactionType.WITHDRAWAL]
+
 
 # Pydantic schemas
 class TransactionCreate(BaseModel):
     transaction_type: TransactionType
     symbol: str | None = None
     quantity: Decimal | None = None
-    price: Decimal | None = None
-    total_amount: Decimal
+    total_amount: Decimal | None = None
     fees: Decimal | None = Decimal("0.00")
     notes: str | None = None
     transaction_date: datetime | None = None
 
-    @validator('symbol')
+    @validator("symbol", always=True)
     def validate_symbol(cls, v, values):
         """Validate that symbol is provided for stock transactions"""
-        if values.get('transaction_type') in [TransactionType.BUY, TransactionType.SELL]:
-            if not v:
-                raise ValueError('Symbol is required for BUY/SELL transactions')
+        is_trade = values.get("transaction_type") in STOCK_TRANSACTION_TYPES
+        if is_trade and not v:
+            raise ValueError("Symbol is required for BUY/SELL transactions")
         return v
 
-    @validator('quantity')
+    @validator("quantity", always=True)
     def validate_quantity(cls, v, values):
         """Validate that quantity is provided for stock transactions"""
-        if values.get('transaction_type') in [TransactionType.BUY, TransactionType.SELL]:
-            if not v or v <= 0:
-                raise ValueError('Quantity must be greater than 0 for BUY/SELL transactions')
+        is_trade = values.get("transaction_type") in STOCK_TRANSACTION_TYPES
+        if is_trade and (not v or v <= 0):
+            raise ValueError("Quantity must be greater than 0 for BUY/SELL transactions")
         return v
 
-    @validator('price')
-    def validate_price(cls, v, values):
-        """Validate that price is provided for stock transactions"""
-        if values.get('transaction_type') in [TransactionType.BUY, TransactionType.SELL]:
-            if not v or v <= 0:
-                raise ValueError('Price must be greater than 0 for BUY/SELL transactions')
+    @validator("total_amount", always=True)
+    def validate_total_amount(cls, v, values):
+        """Validate that total amount is provided for cash transactions"""
+        is_cash = values.get("transaction_type") in CASH_TRANSACTION_TYPES
+        if is_cash and (not v or v <= 0):
+            raise ValueError(
+                "Total amount must be greater than 0 for DEPOSIT/WITHDRAWAL transactions"
+            )
         return v
+
 
 class TransactionResponse(BaseModel):
     id: int
@@ -64,46 +71,63 @@ class TransactionResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 @router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 def create_transaction(
     transaction_data: TransactionCreate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Create a new transaction (BUY/SELL/DEPOSIT/WITHDRAWAL)"""
+    # Stock transactions always execute at the current market price
+    price = None
+    total_amount = transaction_data.total_amount
+    if transaction_data.transaction_type in STOCK_TRANSACTION_TYPES:
+        quote = stock_service.get_stock_quote(transaction_data.symbol)
+        if not quote or not quote.get("price"):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Could not fetch current price for {transaction_data.symbol}",
+            )
+        price = Decimal(str(quote["price"]))
+        total_amount = price * transaction_data.quantity
+
     # Create transaction
     new_transaction = Transaction(
         user_id=current_user.id,
         transaction_type=transaction_data.transaction_type,
         symbol=transaction_data.symbol.upper() if transaction_data.symbol else None,
         quantity=transaction_data.quantity,
-        price=transaction_data.price,
-        total_amount=transaction_data.total_amount,
+        price=price,
+        total_amount=total_amount,
         fees=transaction_data.fees,
         notes=transaction_data.notes,
-        transaction_date=transaction_data.transaction_date or datetime.utcnow()
+        transaction_date=transaction_data.transaction_date or datetime.utcnow(),
     )
 
     # Update user based on transaction type
     if transaction_data.transaction_type == TransactionType.BUY:
         # Deduct cash for purchase
-        total_cost = transaction_data.total_amount + transaction_data.fees
+        total_cost = total_amount + transaction_data.fees
         if current_user.cash_balance < total_cost:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Insufficient cash balance"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient cash balance"
             )
         current_user.cash_balance -= total_cost
 
         # Update or create stock holding
-        holding = db.query(StockHolding).filter(
-            StockHolding.user_id == current_user.id,
-            StockHolding.symbol == transaction_data.symbol.upper()
-        ).first()
+        holding = (
+            db.query(StockHolding)
+            .filter(
+                StockHolding.user_id == current_user.id,
+                StockHolding.symbol == transaction_data.symbol.upper(),
+            )
+            .first()
+        )
 
         if holding:
             # Update existing holding (calculate new average cost)
-            total_cost_basis = (holding.quantity * holding.average_cost) + transaction_data.total_amount
+            total_cost_basis = (holding.quantity * holding.average_cost) + total_amount
             holding.quantity += transaction_data.quantity
             holding.average_cost = total_cost_basis / holding.quantity
         else:
@@ -112,31 +136,35 @@ def create_transaction(
                 user_id=current_user.id,
                 symbol=transaction_data.symbol.upper(),
                 quantity=transaction_data.quantity,
-                average_cost=transaction_data.price
+                average_cost=price,
             )
             db.add(new_holding)
 
     elif transaction_data.transaction_type == TransactionType.SELL:
         # Check if holding exists and has sufficient quantity
-        holding = db.query(StockHolding).filter(
-            StockHolding.user_id == current_user.id,
-            StockHolding.symbol == transaction_data.symbol.upper()
-        ).first()
+        holding = (
+            db.query(StockHolding)
+            .filter(
+                StockHolding.user_id == current_user.id,
+                StockHolding.symbol == transaction_data.symbol.upper(),
+            )
+            .first()
+        )
 
         if not holding:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"No holdings found for {transaction_data.symbol}"
+                detail=f"No holdings found for {transaction_data.symbol}",
             )
 
         if holding.quantity < transaction_data.quantity:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Insufficient shares. You have {holding.quantity}, trying to sell {transaction_data.quantity}"
+                detail=f"Insufficient shares. You have {holding.quantity}, trying to sell {transaction_data.quantity}",
             )
 
         # Add cash from sale
-        total_proceeds = transaction_data.total_amount - transaction_data.fees
+        total_proceeds = total_amount - transaction_data.fees
         current_user.cash_balance += total_proceeds
 
         # Update holding
@@ -146,16 +174,16 @@ def create_transaction(
 
     elif transaction_data.transaction_type == TransactionType.DEPOSIT:
         # Add cash to user
-        current_user.cash_balance += transaction_data.total_amount
+        current_user.cash_balance += total_amount
 
     elif transaction_data.transaction_type == TransactionType.WITHDRAWAL:
         # Deduct cash from user
-        if current_user.cash_balance < transaction_data.total_amount:
+        if current_user.cash_balance < total_amount:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Insufficient cash balance for withdrawal"
+                detail="Insufficient cash balance for withdrawal",
             )
-        current_user.cash_balance -= transaction_data.total_amount
+        current_user.cash_balance -= total_amount
 
     db.add(new_transaction)
     db.commit()
@@ -163,55 +191,54 @@ def create_transaction(
 
     return new_transaction
 
+
 @router.get("/", response_model=list[TransactionResponse])
-def get_transactions(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
+def get_transactions(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get all transactions for user"""
-    transactions = db.query(Transaction).filter(
-        Transaction.user_id == current_user.id
-    ).order_by(Transaction.transaction_date.desc()).all()
+    transactions = (
+        db.query(Transaction)
+        .filter(Transaction.user_id == current_user.id)
+        .order_by(Transaction.transaction_date.desc())
+        .all()
+    )
 
     return transactions
+
 
 @router.get("/{transaction_id}", response_model=TransactionResponse)
 def get_transaction(
     transaction_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Get specific transaction details"""
-    transaction = db.query(Transaction).filter(
-        Transaction.id == transaction_id,
-        Transaction.user_id == current_user.id
-    ).first()
+    transaction = (
+        db.query(Transaction)
+        .filter(Transaction.id == transaction_id, Transaction.user_id == current_user.id)
+        .first()
+    )
 
     if not transaction:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Transaction not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
 
     return transaction
+
 
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_transaction(
     transaction_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Delete a transaction (will recalculate user holdings)"""
-    transaction = db.query(Transaction).filter(
-        Transaction.id == transaction_id,
-        Transaction.user_id == current_user.id
-    ).first()
+    transaction = (
+        db.query(Transaction)
+        .filter(Transaction.id == transaction_id, Transaction.user_id == current_user.id)
+        .first()
+    )
 
     if not transaction:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Transaction not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
 
     # Reverse the transaction effects
     if transaction.transaction_type == TransactionType.BUY:
@@ -220,19 +247,26 @@ def delete_transaction(
         current_user.cash_balance += total_cost
 
         # Update holding
-        holding = db.query(StockHolding).filter(
-            StockHolding.user_id == current_user.id,
-            StockHolding.symbol == transaction.symbol
-        ).first()
+        holding = (
+            db.query(StockHolding)
+            .filter(
+                StockHolding.user_id == current_user.id, StockHolding.symbol == transaction.symbol
+            )
+            .first()
+        )
 
         if holding:
             if holding.quantity <= transaction.quantity:
                 db.delete(holding)
             else:
                 # Recalculate average cost
-                total_cost_basis = (holding.quantity * holding.average_cost) - transaction.total_amount
+                total_cost_basis = (
+                    holding.quantity * holding.average_cost
+                ) - transaction.total_amount
                 holding.quantity -= transaction.quantity
-                holding.average_cost = total_cost_basis / holding.quantity if holding.quantity > 0 else Decimal("0.00")
+                holding.average_cost = (
+                    total_cost_basis / holding.quantity if holding.quantity > 0 else Decimal("0.00")
+                )
 
     elif transaction.transaction_type == TransactionType.SELL:
         # Deduct cash
@@ -240,10 +274,13 @@ def delete_transaction(
         current_user.cash_balance -= total_proceeds
 
         # Restore holding
-        holding = db.query(StockHolding).filter(
-            StockHolding.user_id == current_user.id,
-            StockHolding.symbol == transaction.symbol
-        ).first()
+        holding = (
+            db.query(StockHolding)
+            .filter(
+                StockHolding.user_id == current_user.id, StockHolding.symbol == transaction.symbol
+            )
+            .first()
+        )
 
         if holding:
             # Add shares back
@@ -256,7 +293,7 @@ def delete_transaction(
                 user_id=current_user.id,
                 symbol=transaction.symbol,
                 quantity=transaction.quantity,
-                average_cost=transaction.price
+                average_cost=transaction.price,
             )
             db.add(new_holding)
 

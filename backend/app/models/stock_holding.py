@@ -19,6 +19,4 @@ class StockHolding(Base):
     user = relationship("User", back_populates="holdings")
 
     # Composite unique constraint: one holding per symbol per user
-    __table_args__ = (
-        {"schema": None},
-    )
+    __table_args__ = ({"schema": None},)

@@ -6,7 +6,7 @@ from app.api import auth, stocks, transactions, watchlist, websocket
 app = FastAPI(
     title="Trading Portfolio Tracker API",
     description="Real-time stock portfolio tracking and analytics",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # CORS middleware for React frontend
@@ -25,9 +25,11 @@ app.include_router(transactions.router, prefix="/api/transactions", tags=["Trans
 app.include_router(watchlist.router, prefix="/api/watchlist", tags=["Watchlist"])
 app.include_router(websocket.router, prefix="/ws", tags=["WebSocket"])
 
+
 @app.get("/")
 def read_root():
     return {"message": "Trading Portfolio Tracker API", "status": "running"}
+
 
 @app.get("/health")
 def health_check():

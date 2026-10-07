@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { transactionsAPI, stocksAPI } from '../services/api';
+import { transactionsAPI } from '../services/api';
 import useAuthStore from '../store/authStore';
 
 
@@ -202,12 +202,6 @@ function TransactionModal({ onClose, onSuccess }) {
       if (formData.transaction_type === 'BUY' || formData.transaction_type === 'SELL') {
         payload.symbol = formData.symbol.toUpperCase();
         payload.quantity = parseFloat(formData.quantity);
-
-        // Fetch current market price
-        const quoteResponse = await stocksAPI.getQuote(payload.symbol);
-        const currentPrice = quoteResponse.data.price;
-        payload.price = currentPrice;
-        payload.total_amount = currentPrice * payload.quantity;
       } else {
         // For DEPOSIT/WITHDRAWAL, use the user-entered total_amount
         payload.total_amount = parseFloat(formData.total_amount);

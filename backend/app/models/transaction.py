@@ -13,6 +13,7 @@ class TransactionType(str, enum.Enum):
     DEPOSIT = "DEPOSIT"
     WITHDRAWAL = "WITHDRAWAL"
 
+
 class Transaction(Base):
     __tablename__ = "transactions"
 

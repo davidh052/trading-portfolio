@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { stocksAPI } from '../services/api';
+import { stocksAPI, transactionsAPI } from '../services/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 function Stocks() {
@@ -15,6 +15,8 @@ function Stocks() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [tradeType, setTradeType] = useState(null);
+  const [tradeMessage, setTradeMessage] = useState(null);
 
   // Load stock from URL parameter if provided
   useEffect(() => {
@@ -53,6 +55,7 @@ function Stocks() {
     setSelectedStock(symbol);
     setLoading(true);
     setError(null);
+    setTradeMessage(null);
     setSearchQuery('');
     setSearchResults([]);
 
@@ -181,8 +184,28 @@ function Stocks() {
                   {quote.change >= 0 ? '+' : ''}{quote.change?.toFixed(2)}
                   ({quote.change_percent >= 0 ? '+' : ''}{quote.change_percent?.toFixed(2)}%)
                 </div>
+                <div className="flex justify-end gap-2 mt-3">
+                  <button
+                    onClick={() => setTradeType('BUY')}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    Buy
+                  </button>
+                  <button
+                    onClick={() => setTradeType('SELL')}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  >
+                    Sell
+                  </button>
+                </div>
               </div>
             </div>
+
+            {tradeMessage && (
+              <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+                {tradeMessage}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
               <div>
@@ -366,6 +389,104 @@ function Stocks() {
           <p className="text-gray-500">Enter a symbol or company name to view stock information, charts, and company details.</p>
         </div>
       )}
+
+      {tradeType && quote && (
+        <TradeModal
+          symbol={quote.symbol}
+          price={quote.price}
+          tradeType={tradeType}
+          formatCurrency={formatCurrency}
+          onClose={() => setTradeType(null)}
+          onSuccess={(tx) => {
+            setTradeType(null);
+            setTradeMessage(
+              `${tx.transaction_type === 'BUY' ? 'Bought' : 'Sold'} ${Number(tx.quantity)} ${tx.symbol} at ${formatCurrency(tx.price)}`
+            );
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function TradeModal({ symbol, price, tradeType, formatCurrency, onClose, onSuccess }) {
+  const [quantity, setQuantity] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const isBuy = tradeType === 'BUY';
+  const estimatedTotal = (parseFloat(quantity) || 0) * (price || 0);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await transactionsAPI.create({
+        symbol,
+        transaction_type: tradeType,
+        quantity: parseFloat(quantity),
+      });
+      onSuccess(response.data);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Failed to place trade');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-8 max-w-md w-full">
+        <h2 className="text-2xl font-bold mb-4">{isBuy ? 'Buy' : 'Sell'} {symbol}</h2>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+            <input
+              type="number"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              step="0.0001"
+              min="0.0001"
+              autoFocus
+              required
+            />
+            <p className="mt-1 text-sm text-gray-500">
+              Estimated total: {formatCurrency(estimatedTotal)} (executes at current market price)
+            </p>
+          </div>
+
+          <div className="flex space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className={`flex-1 px-4 py-2 text-white rounded-lg disabled:opacity-50 ${
+                isBuy ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
+              }`}
+              disabled={loading}
+            >
+              {loading ? 'Submitting...' : `Confirm ${isBuy ? 'Buy' : 'Sell'}`}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

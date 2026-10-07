@@ -25,7 +25,7 @@ class StockService:
                 "quotesCount": 10,
                 "newsCount": 0,
                 "listsCount": 0,
-                "quotesQueryId": "tss_match_phrase_query"
+                "quotesQueryId": "tss_match_phrase_query",
             }
             headers = {"User-Agent": "Mozilla/5.0"}
             response = requests.get(url, params=params, headers=headers, timeout=10)
@@ -37,13 +37,15 @@ class StockService:
                 # Filter to only equity types (stocks)
                 if quote.get("quoteType") not in ["EQUITY", "ETF"]:
                     continue
-                results.append({
-                    "symbol": quote.get("symbol"),
-                    "name": quote.get("longname") or quote.get("shortname"),
-                    "type": quote.get("quoteType"),
-                    "region": quote.get("exchange"),
-                    "currency": quote.get("currency", "USD")
-                })
+                results.append(
+                    {
+                        "symbol": quote.get("symbol"),
+                        "name": quote.get("longname") or quote.get("shortname"),
+                        "type": quote.get("quoteType"),
+                        "region": quote.get("exchange"),
+                        "currency": quote.get("currency", "USD"),
+                    }
+                )
             return results
         except Exception as e:
             print(f"Yahoo Finance search error: {e}")
@@ -83,7 +85,7 @@ class StockService:
                 "open": info.get("open") or info.get("regularMarketOpen"),
                 "previous_close": previous_close,
                 "currency": info.get("currency", "USD"),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
             print(f"yfinance quote error: {e}")
@@ -92,7 +94,7 @@ class StockService:
                 params = {
                     "function": "GLOBAL_QUOTE",
                     "symbol": symbol,
-                    "apikey": ALPHA_VANTAGE_API_KEY
+                    "apikey": ALPHA_VANTAGE_API_KEY,
                 }
                 response = requests.get(ALPHA_VANTAGE_BASE_URL, params=params, timeout=10)
                 response.raise_for_status()
@@ -105,7 +107,9 @@ class StockService:
                         "name": symbol,
                         "price": float(quote.get("05. price", 0)),
                         "change": float(quote.get("09. change", 0)),
-                        "change_percent": float(quote.get("10. change percent", "0").replace("%", "")),
+                        "change_percent": float(
+                            quote.get("10. change percent", "0").replace("%", "")
+                        ),
                         "volume": int(quote.get("06. volume", 0)),
                         "market_cap": None,
                         "day_high": float(quote.get("03. high", 0)),
@@ -113,7 +117,7 @@ class StockService:
                         "open": float(quote.get("02. open", 0)),
                         "previous_close": float(quote.get("08. previous close", 0)),
                         "currency": "USD",
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": datetime.now().isoformat(),
                     }
             except Exception as av_error:
                 print(f"Alpha Vantage quote error: {av_error}")
@@ -132,7 +136,7 @@ class StockService:
                 "3M": "3mo",
                 "6M": "6mo",
                 "1Y": "1y",
-                "5Y": "5y"
+                "5Y": "5y",
             }
 
             yf_period = period_map.get(period, "1mo")
@@ -151,24 +155,23 @@ class StockService:
             # Convert DataFrame to list of dicts
             history_data = []
             for date, row in hist.iterrows():
-                history_data.append({
-                    "date": date.strftime("%Y-%m-%d"),
-                    "open": round(row["Open"], 2),
-                    "high": round(row["High"], 2),
-                    "low": round(row["Low"], 2),
-                    "close": round(row["Close"], 2),
-                    "volume": int(row["Volume"])
-                })
+                history_data.append(
+                    {
+                        "date": date.strftime("%Y-%m-%d"),
+                        "open": round(row["Open"], 2),
+                        "high": round(row["High"], 2),
+                        "low": round(row["Low"], 2),
+                        "close": round(row["Close"], 2),
+                        "volume": int(row["Volume"]),
+                    }
+                )
 
             print(f"Returning {len(history_data)} history records")
-            return {
-                "symbol": symbol.upper(),
-                "period": period,
-                "data": history_data
-            }
+            return {"symbol": symbol.upper(), "period": period, "data": history_data}
         except Exception as e:
             print(f"Error fetching historical data for {symbol}: {e}")
             import traceback
+
             traceback.print_exc()
             return None
 
@@ -204,13 +207,14 @@ class StockService:
                 "52_week_high": info.get("fiftyTwoWeekHigh"),
                 "52_week_low": info.get("fiftyTwoWeekLow"),
                 "avg_volume": info.get("averageVolume"),
-                "currency": info.get("currency", "USD")
+                "currency": info.get("currency", "USD"),
             }
             print(f"Returning company info with name: {result['name']}")
             return result
         except Exception as e:
             print(f"Error fetching company info for {symbol}: {e}")
             import traceback
+
             traceback.print_exc()
             return None
 

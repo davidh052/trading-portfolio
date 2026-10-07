@@ -4,6 +4,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 router = APIRouter()
 
+
 class ConnectionManager:
     """Manages WebSocket connections for real-time stock updates"""
 
@@ -30,13 +31,11 @@ class ConnectionManager:
         """Send price update to all subscribers of a symbol"""
         for websocket, symbols in self.subscriptions.items():
             if symbol in symbols:
-                await websocket.send_json({
-                    "type": "price_update",
-                    "symbol": symbol,
-                    "data": data
-                })
+                await websocket.send_json({"type": "price_update", "symbol": symbol, "data": data})
+
 
 manager = ConnectionManager()
+
 
 @router.websocket("/stocks")
 async def websocket_endpoint(websocket: WebSocket):
@@ -50,10 +49,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if message.get("type") == "subscribe":
                 symbols = message.get("symbols", [])
                 await manager.subscribe(websocket, symbols)
-                await websocket.send_json({
-                    "type": "subscribed",
-                    "symbols": symbols
-                })
+                await websocket.send_json({"type": "subscribed", "symbols": symbols})
 
             # TODO: Implement fetching real-time prices and broadcasting
 

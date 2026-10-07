@@ -1,7 +1,7 @@
 # Trading Portfolio - Development Commands
 # ========================================
 
-.PHONY: help lint lint-fix lint-backend lint-frontend install-lint
+.PHONY: help lint lint-fix lint-backend lint-frontend install-lint test
 
 help:
 	@echo "Available commands:"
@@ -10,6 +10,7 @@ help:
 	@echo "  make lint-backend  - Run Ruff on Python backend"
 	@echo "  make lint-frontend - Run ESLint on React frontend"
 	@echo "  make install-lint  - Install linting dependencies"
+	@echo "  make test          - Run backend tests with coverage (needs Postgres running)"
 
 # Run all linters
 lint: lint-backend lint-frontend
@@ -38,3 +39,8 @@ install-lint:
 	pip3 install ruff
 	@echo "📦 Installing frontend linting tools..."
 	cd frontend && npm install
+
+# Backend tests (uses the trading_portfolio_test database; start Postgres with docker compose up -d)
+test:
+	@echo "🧪 Running backend tests..."
+	cd backend && python3 -m pytest --cov=app --cov-report=term-missing

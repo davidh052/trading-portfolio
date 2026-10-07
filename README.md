@@ -1,5 +1,7 @@
 # Trading Portfolio Tracker
 
+[![CI](https://github.com/davidh052/trading-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/davidh052/trading-portfolio/actions/workflows/ci.yml)
+
 A full-stack real-time stock portfolio tracking application with analytics. Built with Python (FastAPI), React, and PostgreSQL.
 
 ## Features
