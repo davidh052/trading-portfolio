@@ -1,0 +1,67 @@
+#!/bin/bash
+# First-boot setup for the backend instance (Amazon Linux 2023).
+# Rendered by Terraform's templatefile(): a doubled dollar sign escapes a shell variable,
+# a single one is a value filled in by Terraform.
+# No `set -x`: it would print the database URL (with password) into the cloud-init log
+set -euo pipefail
+
+dnf install -y docker
+systemctl enable --now docker
+
+mkdir -p /opt/app
+
+# deploy.sh <image-tag>: pull the image from ECR and (re)start the backend container.
+# CD runs this through SSM Run Command on every merge to main.
+cat > /opt/app/deploy.sh <<'DEPLOY'
+#!/bin/bash
+set -euo pipefail
+TAG="$${1:-latest}"
+REGION="${region}"
+REPO="${ecr_repository_url}"
+PARAM_PREFIX="${param_prefix}"
+
+aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$${REPO%%/*}"
+docker pull "$REPO:$TAG"
+
+# Build the container's env file from SSM Parameter Store (secrets never touch the image or git)
+umask 077
+aws ssm get-parameters-by-path --path "$PARAM_PREFIX/" --with-decryption --region "$REGION" \
+  --query "Parameters[].[Name,Value]" --output text \
+  | while IFS=$'\t' read -r name value; do echo "$${name##*/}=$value"; done > /opt/app/app.env
+
+docker rm -f backend 2>/dev/null || true
+docker run -d --name backend --restart unless-stopped -p 8000:8000 \
+  --env-file /opt/app/app.env --log-driver awslogs \
+  --log-opt awslogs-region="$REGION" --log-opt awslogs-group="${log_group}" \
+  "$REPO:$TAG"
+
+for _ in $(seq 1 30); do
+  if curl -sf http://localhost:8000/health; then
+    echo " deployed $REPO:$TAG"
+    docker image prune -af >/dev/null
+    exit 0
+  fi
+  sleep 2
+done
+echo "backend failed health check" >&2
+docker logs --tail 50 backend >&2 || true
+exit 1
+DEPLOY
+chmod 755 /opt/app/deploy.sh
+
+# Load the database schema once (skipped if the tables already exist)
+echo '${schema_sql_b64}' | base64 -d > /opt/app/schema.sql
+DB_URL=$(aws ssm get-parameter --name "${param_prefix}/DATABASE_URL" --with-decryption \
+  --region "${region}" --query Parameter.Value --output text)
+for _ in $(seq 1 30); do
+  EXISTS=$(docker run --rm postgres:15-alpine psql "$DB_URL" -tAc "SELECT to_regclass('public.users')" || echo "unreachable")
+  if [ "$EXISTS" = "users" ]; then
+    echo "schema already present"
+    break
+  elif [ "$EXISTS" != "unreachable" ]; then
+    docker run --rm -v /opt/app:/sql postgres:15-alpine psql "$DB_URL" -v ON_ERROR_STOP=1 -f /sql/schema.sql
+    echo "schema loaded"
+    break
+  fi
+  sleep 10
+done
